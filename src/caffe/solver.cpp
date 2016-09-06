@@ -1,6 +1,7 @@
 #include <cstdio>
 
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include "caffe/solver.hpp"
@@ -8,6 +9,10 @@
 #include "caffe/util/hdf5.hpp"
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
+
+#ifdef USE_NVTX
+#include "caffe/util/mark_profile.hpp"
+#endif
 
 namespace caffe {
 
@@ -211,6 +216,16 @@ void Solver<Dtype>::Step(int iters) {
       }
     }
 
+#ifdef USE_NVTX
+    ostringstream msg;
+    msg << "[" << param_.device_id() << "] Training Iteration " << iter_;
+    if (iter_ % 2){
+      push_nvmark_range(msg.str(), 0);
+    } else {
+      push_nvmark_range(msg.str(), 1);
+    }
+#endif
+    
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_start();
     }
@@ -250,8 +265,14 @@ void Solver<Dtype>::Step(int iters) {
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_gradients_ready();
     }
+#ifdef USE_NVTX
+    push_nvmark_range("Update parameters", 4);
+#endif
     ApplyUpdate();
-
+#ifdef USE_NVTX
+    pop_nvmark_range();
+#endif
+    
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
@@ -270,6 +291,9 @@ void Solver<Dtype>::Step(int iters) {
       // Break out of training loop.
       break;
     }
+#ifdef USE_NVTX
+    pop_nvmark_range();
+#endif
   }
 }
 
@@ -343,6 +367,15 @@ void Solver<Dtype>::Test(const int test_net_id) {
   const shared_ptr<Net<Dtype> >& test_net = test_nets_[test_net_id];
   Dtype loss = 0;
   for (int i = 0; i < param_.test_iter(test_net_id); ++i) {
+#ifdef USE_NVTX
+    ostringstream msg;
+    msg << "[" << param_.device_id() << "] Testing Iteration " << i;
+    if (i % 2){
+      push_nvmark_range(msg.str(), 0);
+    } else {
+      push_nvmark_range(msg.str(), 1);
+    }
+#endif    
     SolverAction::Enum request = GetRequestedAction();
     // Check to see if stoppage of testing/training has been requested.
     while (request != SolverAction::NONE) {
@@ -381,6 +414,9 @@ void Solver<Dtype>::Test(const int test_net_id) {
         }
       }
     }
+#ifdef USE_NVTX
+    pop_nvmark_range();
+#endif
   }
   if (requested_early_exit_) {
     LOG(INFO)     << "Test interrupted.";

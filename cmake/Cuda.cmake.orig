@@ -252,13 +252,6 @@ if(USE_CUDNN)
   endif()
 endif()
 
-# enable nvtx
-if(USE_NVTX)
-  add_definitions(-DUSE_NVTX)
-  list(APPEND Caffe_LINKER_LIBS ${CUDA_nvToolsExt_LIBRARY})
-  list(APPEND CUDA_NVCC_FLAGS "-lnvToolsExt")
-endif()
-
 # setting nvcc arch flags
 caffe_select_nvcc_arch_flags(NVCC_FLAGS_EXTRA)
 list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})

@@ -17,6 +17,9 @@ class SGDSolver : public Solver<Dtype> {
  public:
   explicit SGDSolver(const SolverParameter& param)
       : Solver<Dtype>(param) { PreSolve(); }
+  explicit SGDSolver(const SolverParameter& param, 
+		     const Solver<Dtype>* root_solver)
+      : Solver<Dtype>(param, root_solver) { PreSolve(); }
   explicit SGDSolver(const string& param_file)
       : Solver<Dtype>(param_file) { PreSolve(); }
   virtual inline const char* type() const { return "SGD"; }
@@ -141,6 +144,40 @@ class AdamSolver : public SGDSolver<Dtype> {
   virtual void ComputeUpdateValue(int param_id, Dtype rate);
 
   DISABLE_COPY_AND_ASSIGN(AdamSolver);
+};
+
+/** 
+ * a worker used in parallel overlap training
+ */
+template <typename Dtype>
+class WorkerSGDSolver : public SGDSolver<Dtype> {
+ public:
+  explicit WorkerSGDSolver(const SolverParameter& param,
+		     const Solver<Dtype>* root_solver = NULL)
+    : SGDSolver<Dtype>(param, root_solver) { }
+ protected:
+  void ApplyUpdate(){
+    Dtype rate = this->GetLearningRate();
+    this->ClipGradients();
+    for (int param_id = 0; param_id < this->net_->learnable_params().size();
+	 ++param_id) {
+      this->Normalize(param_id);
+      this->Regularize(param_id);
+      this->ComputeUpdateValue(param_id, rate);
+    }
+    this->net_->Update();
+  }
+  void SnapshotSolverState(const string& model_filename) {
+    LOG(FATAL) << "Should not be called on worker solver.";
+  }
+  void RestoreSolverStateFromBinaryProto(const string& state_file) {
+    LOG(FATAL) << "Should not be called on worker solver.";
+  }
+  void RestoreSolverStateFromHDF5(const string& state_file) {
+    LOG(FATAL) << "Should not be called on worker solver.";
+  }
+
+  DISABLE_COPY_AND_ASSIGN(WorkerSGDSolver);
 };
 
 }  // namespace caffe

@@ -26,6 +26,13 @@ using caffe::Timer;
 using caffe::vector;
 using std::ostringstream;
 
+DEFINE_bool(overlap, false,
+    "Optional; if running in GPU mode."
+    "Use '--overlap' to speed up the training");
+DEFINE_int32(chunk, 1,
+    "Optional; # of layers to exchange b/w gpus and host in one package.");
+DEFINE_int32(threshold, 2000000,
+    "Optional; threshold from which openmp should be applied.");
 DEFINE_string(gpu, "",
     "Optional; run in GPU mode on given device IDs separated by ','."
     "Use '-gpu all' to run on all available GPUs. The effective training "
@@ -245,8 +252,32 @@ int train() {
   }
 
   if (gpus.size() > 1) {
-    caffe::P2PSync<float> sync(solver, NULL, solver->param());
-    sync.Run(gpus);
+    if (FLAGS_overlap){
+      // prepare a CPU buffer
+      const vector<Blob<float>*>& params =
+	solver->net()->learnable_params();
+
+      size_t size = 0;
+      for (int i = 0; i < params.size(); ++i)
+	size += params[i]->count();
+      size = (size > 0) ? size : 1;
+
+      // Gradients on the host
+      float* grads;
+      CUDA_CHECK(cudaMallocHost((void**)&grads, size * sizeof(float)));
+
+      caffe::BlockingQueue<bool> critical_free;
+      critical_free.push(true);
+
+      // create solvers
+      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &critical_free, FLAGS_chunk, FLAGS_threshold);
+      sync.Run(gpus);
+
+      cudaFreeHost(grads);
+    } else {
+      caffe::P2PSync<float> sync(solver, NULL, solver->param());
+      sync.Run(gpus);
+    }
   } else {
     LOG(INFO) << "Starting Optimization";
     solver->Solve();

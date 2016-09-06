@@ -12,6 +12,10 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#ifdef USE_NVTX
+#include "caffe/util/mark_profile.hpp"
+#endif
+
 namespace caffe {
 
 /**
@@ -66,6 +70,22 @@ class Net {
   void ClearParamDiffs();
 
   /**
+   * Invoked at specific points during an iteration
+   */
+  class Callback {
+   protected:
+    virtual void on_gradients_layers_ready(int l) = 0;
+
+    template <typename T>
+    friend class Net;
+  };
+  const vector<Callback*>& callbacks() const { return callbacks_; }
+  void add_callback(Callback* value) {
+    callbacks_.push_back(value);
+  }
+
+  void MapLayerLearnableParams();
+  /**
    * The network backward should take no input and output, since it solely
    * computes the gradient w.r.t the parameters, and the data has already been
    * provided during the forward pass.
@@ -85,8 +105,18 @@ class Net {
 
   Dtype ForwardBackward() {
     Dtype loss;
+#ifdef USE_NVTX
+    push_nvmark_range("Forward", 2);
+#endif
     Forward(&loss);
+#ifdef USE_NVTX
+    pop_nvmark_range();
+    push_nvmark_range("Backward", 3);
+#endif
     Backward();
+#ifdef USE_NVTX
+    pop_nvmark_range();
+#endif
     return loss;
   }
 
@@ -177,6 +207,9 @@ class Net {
   }
   inline const vector<Blob<Dtype>*>& learnable_params() const {
     return learnable_params_;
+  }
+  inline const vector<int> learnable_params_id_vecs(int layer_id) const {
+    return learnable_params_id_vecs_[layer_id];
   }
   /// @brief returns the learnable parameter learning rate multipliers
   inline const vector<float>& params_lr() const { return params_lr_; }
@@ -272,10 +305,13 @@ class Net {
   /// top_vecs stores the vectors containing the output for each layer
   vector<vector<Blob<Dtype>*> > top_vecs_;
   vector<vector<int> > top_id_vecs_;
+  /// callbacks_ stores callback calls to a net
+  vector<Callback*> callbacks_;
   /// Vector of weight in the loss (or objective) function of each net blob,
   /// indexed by blob_id.
   vector<Dtype> blob_loss_weights_;
   vector<vector<int> > param_id_vecs_;
+  vector<vector<int> > learnable_params_id_vecs_;
   vector<int> param_owners_;
   vector<string> param_display_names_;
   vector<pair<int, int> > param_layer_indices_;

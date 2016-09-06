@@ -11,6 +11,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/solver.hpp"
+#include "caffe/net.hpp"
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/blocking_queue.hpp"
 
@@ -111,6 +112,86 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   Dtype* parent_grads_;
   shared_ptr<Solver<Dtype> > solver_;
 
+  using Params<Dtype>::size_;
+  using Params<Dtype>::data_;
+  using Params<Dtype>::diff_;
+};
+
+/**
+ * Data parallelism using overlap of backpropagation and communication
+ */
+template<typename Dtype>
+class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
+		    public Net<Dtype>::Callback,
+		    public InternalThread {
+ public:
+  explicit OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
+		       OverlapSync<Dtype>* parent, const SolverParameter& param,
+		       Dtype* grads, BlockingQueue<bool>* critical_free_,
+		       int chunk, int threshold);
+  virtual ~OverlapSync();
+
+  inline const shared_ptr<Solver<Dtype> >& solver() const {
+    return solver_;
+  }
+
+  void Run(const vector<int>& gpus);
+  void Prepare(const vector<int>& gpus,
+               vector<shared_ptr<OverlapSync<Dtype> > >* syncs);
+  inline const int initial_iter() const { return initial_iter_; }
+  static void CUDART_CB callback_grads(cudaStream_t stream,
+				       cudaError_t status,
+				       void* tp){
+    OverlapSync<Dtype>* sync = (OverlapSync<Dtype>*)tp;
+    sync->accumulate_gradients();
+  }
+  static void CUDART_CB callback_reset_grads(cudaStream_t stream,
+				       cudaError_t status,
+				       void* tp){
+    OverlapSync<Dtype>* sync = (OverlapSync<Dtype>*)tp;
+    sync->reset_gradients();
+  }
+
+ protected:
+  void on_init();
+  void on_start();
+  void on_gradients_ready();
+  void on_gradients_layers_ready(int l);
+  void accumulate_gradients();
+  void reset_gradients();
+  void InternalThreadEntry();
+  
+  OverlapSync<Dtype>* parent_;
+  vector<OverlapSync<Dtype>*> children_;
+  BlockingQueue<OverlapSync<Dtype>*> queue_;
+  const int initial_iter_;
+  shared_ptr<Solver<Dtype> > solver_;
+
+  // a shared array on host to store the summation of gradients
+  Dtype* grads_;
+  // gradients on cpu of a solver
+  Dtype* cpu_diff_;
+  // blobs of learnable parameters that the solver computed
+  // during the backward
+  //  std::queue<int> ready_blobs_;
+  BlockingQueue<vector<int> > ready_blobs_;
+  BlockingQueue<bool>* critical_free_;
+  // mapping the id of a blob in the blobs of learnable parameters to 
+  // its id in the shared array grads_ and diff_
+  vector<int> pid_aid_;
+  vector<int> pid_size_;
+  // the number of blobs of learnable parameters
+  int blobs_num_;
+  // these are used to transfer data between host and devices
+  cudaStream_t d2h_h_stream_;
+  cudaStream_t h2d_stream_;
+  cudaEvent_t event_for_h2d;
+  BlockingQueue<bool> cb_queue_;
+
+  // command line arguments
+  int chunk_;
+  int threshold_;
+  
   using Params<Dtype>::size_;
   using Params<Dtype>::data_;
   using Params<Dtype>::diff_;

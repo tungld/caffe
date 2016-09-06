@@ -31,7 +31,7 @@ template <typename Dtype>
 Net<Dtype>::Net(const string& param_file, Phase phase,
     const int level, const vector<string>* stages,
     const Net* root_net)
-    : root_net_(root_net) {
+    : root_net_(root_net), callbacks_() {
   NetParameter param;
   ReadNetParamsFromTextFileOrDie(param_file, &param);
   // Set phase, stages and level
@@ -595,6 +595,9 @@ void Net<Dtype>::BackwardFromTo(int start, int end) {
       layers_[i]->Backward(
           top_vecs_[i], bottom_need_backward_[i], bottom_vecs_[i]);
       if (debug_info_) { BackwardDebugInfo(i); }
+      for (int j = 0; j < callbacks_.size(); ++j) {
+	callbacks_[j]->on_gradients_layers_ready(i);
+      }
     }
   }
 }
@@ -949,6 +952,17 @@ void Net<Dtype>::ClearParamDiffs() {
   }
 }
 
+template <typename Dtype>
+void Net<Dtype>:: MapLayerLearnableParams() {
+  for (int layer_id = 0; layer_id < param_id_vecs_.size(); ++layer_id){
+    vector<int> lp_id_vecs;
+    for (int i = 0; i < param_id_vecs_[layer_id].size(); ++i){
+      lp_id_vecs.push_back(learnable_param_ids_[param_id_vecs_[layer_id][i]]);
+    }
+    learnable_params_id_vecs_.push_back(lp_id_vecs);
+  }
+}
+  
 template <typename Dtype>
 void Net<Dtype>::ShareWeights() {
   for (int i = 0; i < params_.size(); ++i) {
