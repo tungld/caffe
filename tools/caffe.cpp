@@ -266,11 +266,15 @@ int train() {
       float* grads;
       CUDA_CHECK(cudaMallocHost((void**)&grads, size * sizeof(float)));
 
-      caffe::BlockingQueue<bool> critical_free;
-      critical_free.push(true);
+      vector<caffe::BlockingQueue<int>* > criticals_free;
+      for (int i = 0; i < params.size() / (FLAGS_chunk * 2); ++i){
+	caffe::BlockingQueue<int>* critical_free = new caffe::BlockingQueue<int>();
+	critical_free->push(0);
+	criticals_free.push_back(critical_free);
+      }
 
       // create solvers
-      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &critical_free, FLAGS_chunk, FLAGS_threshold);
+      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_chunk, FLAGS_threshold);
       sync.Run(gpus);
 
       cudaFreeHost(grads);

@@ -94,7 +94,7 @@ template class BlockingQueue<P2PSync<float>*>;
 template class BlockingQueue<P2PSync<double>*>;
 template class BlockingQueue<OverlapSync<float>*>;
 template class BlockingQueue<OverlapSync<double>*>;
-template class BlockingQueue<bool>;
+template class BlockingQueue<int>;
 template class BlockingQueue<vector<int> >;
 
 }  // namespace caffe
