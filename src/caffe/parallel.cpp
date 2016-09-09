@@ -609,7 +609,7 @@ void OverlapSync<Dtype>::on_start() {
 //  CHECK(false);
 #endif
 
-  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));  
   // Wait for other solvers
   barrier_->wait();
   
@@ -732,7 +732,6 @@ void OverlapSync<Dtype>::accumulate_gradients() {
   // CPUTimer timer;
   // timer.Start();
   int idx = criticals_free_->at(glid)->pop();
-  if (idx == solvers_num_) { idx = 0; }
 #ifdef USE_NVTX
   ostringstream msg;
   msg << "[" << solver_->param().device_id() << "] [CPU] Accum. for " << (float)(size * sizeof(Dtype) / (float)1000 / (float)1000) << " MB";
@@ -766,8 +765,6 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   CUDA_CHECK(cudaGetDevice(&device));
   CHECK(device == solver_->param().device_id());
 #endif
-  CUDA_CHECK(cudaStreamSynchronize(d2h_h_stream_));
-  CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
   // send remaining gradients on host to devices
   while (updated_layer_ >= 0) {
     int updated_solvers = 0;
@@ -795,7 +792,6 @@ void OverlapSync<Dtype>::on_gradients_ready() {
  
   // Wait for the last stream finished
   CUDA_CHECK(cudaStreamSynchronize(h2d_stream_));
-  CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
 
   // Loss functions divide gradients by the batch size, so to compensate
   // for split batch, the root solver divides by number of solvers.
