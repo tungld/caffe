@@ -765,9 +765,12 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   CUDA_CHECK(cudaGetDevice(&device));
   CHECK(device == solver_->param().device_id());
 #endif
+
   // send remaining gradients on host to devices
+  // do this only when all callbacks finished
+  CUDA_CHECK(cudaStreamSynchronize(d2h_h_stream_));
+  int updated_solvers = 0;
   while (updated_layer_ >= 0) {
-    int updated_solvers = 0;
     if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
       if (updated_solvers == solvers_num_){
 	int lid = updated_layer_ * (chunk_ * 2);
@@ -782,11 +785,7 @@ void OverlapSync<Dtype>::on_gradients_ready() {
 				   cudaMemcpyHostToDevice,
 				   h2d_stream_));
 	--updated_layer_;
-      } else {
-	continue;
       }
-    } else {
-      break;
     }
   }
  
