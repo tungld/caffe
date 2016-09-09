@@ -266,10 +266,12 @@ void Solver<Dtype>::Step(int iters) {
       callbacks_[i]->on_gradients_ready();
     }
 #ifdef USE_NVTX
+    CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     push_nvmark_range("Update parameters", 4);
 #endif
     ApplyUpdate();
 #ifdef USE_NVTX
+    CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     pop_nvmark_range();
 #endif
     
