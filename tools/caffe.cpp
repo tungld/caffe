@@ -257,6 +257,8 @@ int train() {
       const vector<Blob<float>*>& params =
 	solver->net()->learnable_params();
 
+      CHECK_EQ(params.size() % (FLAGS_chunk * 2), 0);
+  
       size_t size = 0;
       for (int i = 0; i < params.size(); ++i)
 	size += params[i]->count();
@@ -272,6 +274,7 @@ int train() {
 	critical_free->push(0);
 	criticals_free.push_back(critical_free);
       }
+      criticals_free.push_back(new caffe::BlockingQueue<int>());
 
       // create solvers
       caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_chunk, FLAGS_threshold);

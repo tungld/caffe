@@ -629,12 +629,19 @@ void OverlapSync<Dtype>::reset_variables() {
   // timer.Start();
 
   // reset the global gradients
-  memset(grads_, 0, size_ * sizeof(Dtype));
-  // reset queues
+#pragma omp parallel for
+  for (int i = 0; i < size_; ++i){
+    grads_[i] = 0;
+  }
 
-  for (int i = 0; i < criticals_free_->size(); ++i){
+  // reset queues
+  for (int i = 0; i < criticals_free_->size() - 1; ++i){
     criticals_free_->at(i)->pop();
     criticals_free_->at(i)->push(0);
+  }
+  for (int i = 0; i < solvers_num_; ++i){
+    int last = criticals_free_->size() - 1;
+    criticals_free_->at(last)->push(i);
   }
 
   // timer.Stop();
@@ -644,76 +651,73 @@ void OverlapSync<Dtype>::reset_variables() {
 template<typename Dtype>
 void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 #ifndef CPU_ONLY
-  // send previous layer's gradients to gpu
-  if (updated_layer_ >= 0){
-    int updated_solvers = 0;
-    if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
-      if (updated_solvers == solvers_num_){
-	int lid = updated_layer_ * (chunk_ * 2);
-	int offset = pid_aid_.at(lid);
-	int size = 0;
-    
-	for (int i = lid; i < lid + (chunk_ * 2); ++i){
-	  size += pid_size_.at(i);
-	}
-
-	CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
-				   cudaMemcpyHostToDevice,
-				   h2d_stream_));
-	--updated_layer_;
-      }
-    }
-  }
-
-  // send current gradients to host and do accumulation
   const vector<int> learnable_params_id_vecs = solver_->net()
     ->learnable_params_id_vecs(l);
+  if ((learnable_params_id_vecs.size() > 0) &&
+      (learnable_params_id_vecs[0] % (chunk_ * 2) == 0)){
+    // wait for reseting global variables
+    if (learnable_params_id_vecs[0] == (blobs_num_ - (chunk_ * 2))){
+      int last = criticals_free_->size() - 1;
+      criticals_free_->at(last)->pop();
+    }
+    
+    // send previous layer's gradients to gpu
+    if (updated_layer_ >= 0){
+      int updated_solvers = 0;
+      if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
+	if (updated_solvers == solvers_num_){
+	  int lid = updated_layer_ * (chunk_ * 2);
+	  int offset = pid_aid_.at(lid);
+	  int size = 0;
+    
+	  for (int i = lid; i < lid + (chunk_ * 2); ++i){
+	    size += pid_size_.at(i);
+	  }
 
-  if (learnable_params_id_vecs.size() > 0 && (learnable_params_id_vecs[0] % (chunk_ * 2) == 0)){
-    int lid = -1;
-    for (int i = learnable_params_id_vecs.size() - 1; i >= 0; --i){
-      if (learnable_params_id_vecs[i] % (chunk_ * 2) == 0) {
-	lid = learnable_params_id_vecs[i];
-	break;
+	  CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
+				     cudaMemcpyHostToDevice,
+				     h2d_stream_));
+	  --updated_layer_;
+	}
       }
     }
 
-    if (lid >= 0){
-      int glid = lid / (chunk_ * 2);
+    // send current gradients to host and do accumulation
+    int lid = learnable_params_id_vecs[0];
+    int glid = lid / (chunk_ * 2);
 #ifdef USE_NVTX
-      ostringstream msg;
-      msg << "postlayer " << glid;
-      if (glid % 2) {
-	push_nvmark_range(msg.str(), 5);
-      } else {
-	push_nvmark_range(msg.str(), 6);
-      }
+    ostringstream msg;
+    msg << "postlayer " << glid;
+    if (glid % 2) {
+      push_nvmark_range(msg.str(), 5);
+    } else {
+      push_nvmark_range(msg.str(), 6);
+    }
 #endif
       
-      int offset = pid_aid_.at(lid);
-      int size = 0;
+    int offset = pid_aid_.at(lid);
+    int size = 0;
     
-      for (int i = lid; i < lid + (chunk_ * 2); ++i){
-	size += pid_size_.at(i);
-      }
-
-      if (size > 0){ // Copy blob values and do accumulation
-	vector<int> vt;
-	vt.push_back(offset);
-	vt.push_back(size);
-	vt.push_back(glid);
-	ready_blobs_.push(vt);
-
-	CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
-				   sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
-				   d2h_h_stream_));
-	cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
-			      (void*)this, 0);
-      }
-#ifdef USE_NVTX
-      pop_nvmark_range();
-#endif
+    for (int i = lid; i < lid + (chunk_ * 2); ++i){
+      size += pid_size_.at(i);
     }
+
+    if (size > 0){ // Copy blob values and do accumulation
+      vector<int> vt;
+      vt.push_back(offset);
+      vt.push_back(size);
+      vt.push_back(glid);
+      ready_blobs_.push(vt);
+
+      CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
+				 sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
+				 d2h_h_stream_));
+      cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
+			    (void*)this, 0);
+    }
+#ifdef USE_NVTX
+    pop_nvmark_range();
+#endif
   }
 #endif
 }
