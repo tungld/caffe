@@ -26,9 +26,8 @@ using caffe::Timer;
 using caffe::vector;
 using std::ostringstream;
 
-DEFINE_bool(overlap, false,
-    "Optional; if running in GPU mode."
-    "Use '--overlap' to speed up the training");
+DEFINE_bool(bvlc, false,
+    "Optional; if running in the original BVLC/Caffe mode.");
 DEFINE_int32(chunk, 1,
     "Optional; # of layers to exchange b/w gpus and host in one package.");
 DEFINE_int32(threshold, 2000000,
@@ -252,7 +251,10 @@ int train() {
   }
 
   if (gpus.size() > 1) {
-    if (FLAGS_overlap){
+    if (FLAGS_bvlc) {
+      caffe::P2PSync<float> sync(solver, NULL, solver->param());
+      sync.Run(gpus);
+    } else {
       // prepare a CPU buffer
       const vector<Blob<float>*>& params =
 	solver->net()->learnable_params();
@@ -281,9 +283,6 @@ int train() {
       sync.Run(gpus);
 
       cudaFreeHost(grads);
-    } else {
-      caffe::P2PSync<float> sync(solver, NULL, solver->param());
-      sync.Run(gpus);
     }
   } else {
     LOG(INFO) << "Starting Optimization";
