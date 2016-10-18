@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "boost/thread.hpp"
-#include "boost/thread/barrier.hpp"
 #include "caffe/caffe.hpp"
 #include "caffe/parallel.hpp"
 
@@ -22,8 +21,6 @@
 
 namespace caffe {
 
-shared_ptr<boost::barrier> barrier_;
-  
 enum Op {
   copy,
   replace_cpu,
@@ -609,10 +606,6 @@ void OverlapSync<Dtype>::on_start() {
 //  CHECK(false);
 #endif
 
-  CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));  
-  // Wait for other solvers
-  barrier_->wait();
-  
   // the root solver clears gradients on the host
   if (parent_ == NULL) {
     cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_reset_variables, 
@@ -844,7 +837,6 @@ template<typename Dtype>
 void OverlapSync<Dtype>::Run(const vector<int>& gpus) {
   vector<shared_ptr<OverlapSync<Dtype> > > syncs(gpus.size());
   Prepare(gpus, &syncs);
-  barrier_.reset(new boost::barrier(gpus.size()));
   
   LOG(INFO)<< "Starting Optimization";
 
