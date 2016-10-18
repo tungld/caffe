@@ -621,12 +621,6 @@ void OverlapSync<Dtype>::reset_variables() {
   // CPUTimer timer;
   // timer.Start();
 
-  // reset the global gradients
-#pragma omp parallel for
-  for (int i = 0; i < size_; ++i){
-    grads_[i] = 0;
-  }
-
   // reset queues
   for (int i = 0; i < criticals_free_->size() - 1; ++i){
     criticals_free_->at(i)->pop();
@@ -734,16 +728,29 @@ void OverlapSync<Dtype>::accumulate_gradients() {
   msg << "[" << solver_->param().device_id() << "] [CPU] Accum. for " << (float)(size * sizeof(Dtype) / (float)1000 / (float)1000) << " MB";
   push_nvmark_range(msg.str(), 0);
 #endif
-  
-  if (size < threshold_) {
-    for(int i = 0; i < size; ++i) {
-      acc[i] += src[i];
+
+  if (idx == 0){
+    if (size < threshold_) {
+      for(int i = 0; i < size; ++i) {
+	acc[i] = src[i];
+      }
+    } else {
+#pragma omp parallel for
+      for(int i = 0; i < size; ++i) {
+	acc[i] = src[i];
+      }      
     }
   } else {
+    if (size < threshold_) {
+      for(int i = 0; i < size; ++i) {
+	acc[i] += src[i];
+      }
+    } else {
 #pragma omp parallel for
-    for(int i = 0; i < size; ++i) {
-      acc[i] += src[i];
-    }      
+      for(int i = 0; i < size; ++i) {
+	acc[i] += src[i];
+      }      
+    }
   }
   criticals_free_->at(glid)->push(++idx);
   // timer.Stop();
