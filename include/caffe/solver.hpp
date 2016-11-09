@@ -88,6 +88,19 @@ class Solver {
     callbacks_.push_back(value);
   }
 
+  // inner callback for iter_size
+  class ICallback {
+   protected:
+    virtual void on_inner_iteration(int inner_iter) = 0;
+
+    template <typename T>
+    friend class Solver;
+  };
+  const vector<ICallback*>& icallbacks() const { return icallbacks_; }
+  void add_icallback(ICallback* value) {
+    icallbacks_.push_back(value);
+  }
+  
   void CheckSnapshotWritePermissions();
   /**
    * @brief Returns the solver type.
@@ -115,6 +128,7 @@ class Solver {
   shared_ptr<Net<Dtype> > net_;
   vector<shared_ptr<Net<Dtype> > > test_nets_;
   vector<Callback*> callbacks_;
+  vector<ICallback*> icallbacks_;
   vector<Dtype> losses_;
   Dtype smoothed_loss_;
 

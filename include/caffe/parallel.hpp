@@ -101,6 +101,7 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
 
  protected:
   void on_start();
+  void on_inner_iteration(int inner_iter){}
   void on_gradients_ready();
 
   void InternalThreadEntry();
@@ -122,7 +123,7 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
  */
 template<typename Dtype>
 class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
-		    public Net<Dtype>::Callback,
+		    public Net<Dtype>::Callback, public Solver<Dtype>::ICallback,
 		    public InternalThread {
  public:
   explicit OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
@@ -155,6 +156,7 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
  protected:
   void on_init();
   void on_start();
+  void on_inner_iteration(int inner_iter);
   void on_gradients_ready();
   void on_gradients_layers_ready(int l);
   void accumulate_gradients();
@@ -190,7 +192,9 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   // these are used to transfer data between host and devices
   cudaStream_t d2h_h_stream_;
   cudaStream_t h2d_stream_;
-
+  // iteration index if iter_size is set
+  int inner_iter_;
+  
   // command line arguments
   int chunk_;
   int threshold_;

@@ -234,6 +234,9 @@ void Solver<Dtype>::Step(int iters) {
     // accumulate the loss and gradient
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
+      for (int j = 0; j < icallbacks_.size(); ++j) {
+	icallbacks_[j]->on_inner_iteration(i);
+      }
       loss += net_->ForwardBackward();
     }
     loss /= param_.iter_size();

@@ -477,6 +477,7 @@ OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
   this->configure(solver_.get());
   solver_->net()->MapLayerLearnableParams();
   solver_->add_callback(this);
+  solver_->add_icallback(this);
   solver_->net()->add_callback(this);
 
   if (parent) {
@@ -641,77 +642,84 @@ void OverlapSync<Dtype>::reset_variables() {
   // timer.Stop();
   // LOG(INFO) << "reset time " << timer.MicroSeconds() << " us";
 }
-  
+
+template<typename Dtype>
+void OverlapSync<Dtype>::on_inner_iteration(int inner_iter){
+  inner_iter_ = inner_iter;
+}
+
 template<typename Dtype>
 void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 #ifndef CPU_ONLY
-  const vector<int> learnable_params_id_vecs = solver_->net()
-    ->learnable_params_id_vecs(l);
-  if ((learnable_params_id_vecs.size() > 0) &&
-      (learnable_params_id_vecs[0] % (chunk_ * 2) == 0)){
-    // wait for reseting global variables
-    if (learnable_params_id_vecs[0] == (blobs_num_ - (chunk_ * 2))){
-      int last = criticals_free_->size() - 1;
-      criticals_free_->at(last)->pop();
-    }
+  if(inner_iter_ == (solver_->param().iter_size() - 1)){
+    const vector<int> learnable_params_id_vecs = solver_->net()
+      ->learnable_params_id_vecs(l);
+    if ((learnable_params_id_vecs.size() > 0) &&
+	(learnable_params_id_vecs[0] % (chunk_ * 2) == 0)){
+      // wait for reseting global variables
+      if (learnable_params_id_vecs[0] == (blobs_num_ - (chunk_ * 2))){
+	int last = criticals_free_->size() - 1;
+	criticals_free_->at(last)->pop();
+      }
     
-    // send previous layer's gradients to gpu
-    if (updated_layer_ >= 0){
-      int updated_solvers = 0;
-      if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
-	if (updated_solvers == solvers_num_){
-	  int lid = updated_layer_ * (chunk_ * 2);
-	  int offset = pid_aid_.at(lid);
-	  int size = 0;
+      // send previous layer's gradients to gpu
+      if (updated_layer_ >= 0){
+	int updated_solvers = 0;
+	if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
+	  if (updated_solvers == solvers_num_){
+	    int lid = updated_layer_ * (chunk_ * 2);
+	    int offset = pid_aid_.at(lid);
+	    int size = 0;
     
-	  for (int i = lid; i < lid + (chunk_ * 2); ++i){
-	    size += pid_size_.at(i);
-	  }
+	    for (int i = lid; i < lid + (chunk_ * 2); ++i){
+	      size += pid_size_.at(i);
+	    }
 
-	  CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
-				     cudaMemcpyHostToDevice,
-				     h2d_stream_));
-	  --updated_layer_;
+	    CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
+				       cudaMemcpyHostToDevice,
+				       h2d_stream_));
+	    --updated_layer_;
+	  }
 	}
       }
-    }
 
-    // send current gradients to host and do accumulation
-    int lid = learnable_params_id_vecs[0];
-    int glid = lid / (chunk_ * 2);
+      // send current gradients to host and do accumulation
+      int lid = learnable_params_id_vecs[0];
+      int glid = lid / (chunk_ * 2);
 #ifdef USE_NVTX
-    ostringstream msg;
-    msg << "postlayer " << glid;
-    if (glid % 2) {
-      push_nvmark_range(msg.str(), 5);
-    } else {
-      push_nvmark_range(msg.str(), 6);
-    }
+      ostringstream msg;
+      msg << "postlayer " << glid;
+      if (glid % 2) {
+	push_nvmark_range(msg.str(), 5);
+      } else {
+	push_nvmark_range(msg.str(), 6);
+      }
 #endif
       
-    int offset = pid_aid_.at(lid);
-    int size = 0;
+      int offset = pid_aid_.at(lid);
+      int size = 0;
     
-    for (int i = lid; i < lid + (chunk_ * 2); ++i){
-      size += pid_size_.at(i);
-    }
+      for (int i = lid; i < lid + (chunk_ * 2); ++i){
+	size += pid_size_.at(i);
+      }
 
-    if (size > 0){ // Copy blob values and do accumulation
-      vector<int> vt;
-      vt.push_back(offset);
-      vt.push_back(size);
-      vt.push_back(glid);
-      ready_blobs_.push(vt);
+      if (size > 0){ // Copy blob values and do accumulation
+	vector<int> vt;
+	vt.push_back(offset);
+	vt.push_back(size);
+	vt.push_back(glid);
+	ready_blobs_.push(vt);
 
-      CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
-				 sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
-				 d2h_h_stream_));
-      cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
-			    (void*)this, 0);
-    }
+	CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
+				   sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
+				   d2h_h_stream_));
+	cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
+			      (void*)this, 0);
+      }
 #ifdef USE_NVTX
-    pop_nvmark_range();
+      pop_nvmark_range();
 #endif
+    }
   }
 #endif
 }
