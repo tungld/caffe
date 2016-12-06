@@ -255,6 +255,7 @@ int train() {
       caffe::P2PSync<float> sync(solver, NULL, solver->param());
       sync.Run(gpus);
     } else {
+#ifndef CPU_ONLY
       // prepare a CPU buffer
       const vector<Blob<float>*>& params =
 	solver->net()->learnable_params();
@@ -283,6 +284,7 @@ int train() {
       sync.Run(gpus);
 
       cudaFreeHost(grads);
+#endif
     }
   } else {
     LOG(INFO) << "Starting Optimization";

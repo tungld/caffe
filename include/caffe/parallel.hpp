@@ -140,6 +140,7 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   void Prepare(const vector<int>& gpus,
                vector<shared_ptr<OverlapSync<Dtype> > >* syncs);
   inline const int initial_iter() const { return initial_iter_; }
+  #ifndef CPU_ONLY
   static void CUDART_CB callback_grads(cudaStream_t stream,
 				       cudaError_t status,
 				       void* tp){
@@ -152,7 +153,7 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
     OverlapSync<Dtype>* sync = (OverlapSync<Dtype>*)tp;
     sync->reset_variables();
   }
-
+  #endif
  protected:
   void on_init();
   void on_start();
@@ -190,8 +191,10 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   // this layer is ready to send the accum. on host to GPU
   int updated_layer_;
   // these are used to transfer data between host and devices
+  #ifndef CPU_ONLY
   cudaStream_t d2h_h_stream_;
   cudaStream_t h2d_stream_;
+  #endif
   // iteration index if iter_size is set
   int inner_iter_;
   
