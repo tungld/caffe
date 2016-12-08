@@ -619,7 +619,6 @@ void OverlapSync<Dtype>::on_start() {
     cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_reset_variables, 
   			  (void*)this, 0);
   }
-  updated_layer_ = blobs_num_ / (chunk_ * 2) - 1;
 
 #endif
 }
@@ -663,8 +662,9 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
       }
     
       // send previous layer's gradients to gpu
-      if (updated_layer_ >= 0){
+      if (updated_layers_.size() > 0){
 	int updated_solvers = 0;
+	int updated_layer_ = updated_layers_.pop();
 	if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
 	  if (updated_solvers == solvers_num_){
 	    int lid = updated_layer_ * (chunk_ * 2);
@@ -678,7 +678,6 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 	    CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
 				       cudaMemcpyHostToDevice,
 				       h2d_stream_));
-	    --updated_layer_;
 	  }
 	}
       }
@@ -715,6 +714,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 				   d2h_h_stream_));
 	cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
 			      (void*)this, 0);
+	updated_layers_.push(glid);
       }
 #ifdef USE_NVTX
       pop_nvmark_range();
@@ -789,7 +789,8 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   // do this only when all callbacks finished
   CUDA_CHECK(cudaStreamSynchronize(d2h_h_stream_));
   int updated_solvers = 0;
-  while (updated_layer_ >= 0) {
+  while (updated_layers_.size() > 0) {
+    int updated_layer_ = updated_layers_.pop();
     if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
       if (updated_solvers == solvers_num_){
 	int lid = updated_layer_ * (chunk_ * 2);
@@ -803,7 +804,6 @@ void OverlapSync<Dtype>::on_gradients_ready() {
 	CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
 				   cudaMemcpyHostToDevice,
 				   h2d_stream_));
-	--updated_layer_;
       }
     }
   }

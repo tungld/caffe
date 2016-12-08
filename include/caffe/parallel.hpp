@@ -186,9 +186,9 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   int blobs_num_;
   // the number of solvers/gpus
   int solvers_num_;
-  // the layer that has had the updated accumulation on host
+  // a list of layers that has had the updated accumulation on host
   // this layer is ready to send the accum. on host to GPU
-  int updated_layer_;
+  BlockingQueue<int > updated_layers_;  
   // these are used to transfer data between host and devices
   cudaStream_t d2h_h_stream_;
   cudaStream_t h2d_stream_;
