@@ -18,8 +18,6 @@
 #include "caffe/util/mark_profile.hpp"
 #endif
 
-#include "caffe/sgd_solvers.hpp"
-
 namespace caffe {
 
 shared_ptr<boost::barrier> barrier_;
@@ -471,7 +469,8 @@ OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
     solver_ = root_solver;
   } else {
     Caffe::set_root_solver(false);
-    solver_.reset(new WorkerSGDSolver<Dtype>(param, root_solver.get()));
+    solver_.reset(caffe::SolverRegistry<Dtype>::CreateSolver(param,
+							     root_solver.get()));
     Caffe::set_root_solver(true);
   }
   this->configure(solver_.get());
