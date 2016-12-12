@@ -448,12 +448,12 @@ void P2PSync<Dtype>::Run(const vector<int>& gpus) {
 template<typename Dtype>
 OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
 			OverlapSync<Dtype>* parent, const SolverParameter& param,
-				Dtype* grads, vector<BlockingQueue<int>* >* criticals_free,
+			Dtype* grads, vector<BlockingQueue<int>* >* criticals_free,
 			int chunk, int threshold)
     : GPUParams<Dtype>(root_solver, param.device_id()),
       parent_(parent),
       children_(),
-      queue_(),
+      queue_(), updated_layers_(),
       initial_iter_(root_solver->iter()),
       solver_(),
       grads_(grads),
@@ -663,7 +663,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
       // send previous layer's gradients to gpu
       if (updated_layers_.size() > 0){
 	int updated_solvers = 0;
-	int updated_layer_ = updated_layers_.pop();
+	int updated_layer_ = updated_layers_.peek();
 	if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
 	  if (updated_solvers == solvers_num_){
 	    int lid = updated_layer_ * (chunk_ * 2);
@@ -677,6 +677,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 	    CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
 				       cudaMemcpyHostToDevice,
 				       h2d_stream_));
+	    updated_layers_.pop();
 	  }
 	}
       }
@@ -789,7 +790,7 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   CUDA_CHECK(cudaStreamSynchronize(d2h_h_stream_));
   int updated_solvers = 0;
   while (updated_layers_.size() > 0) {
-    int updated_layer_ = updated_layers_.pop();
+    int updated_layer_ = updated_layers_.peek();
     if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
       if (updated_solvers == solvers_num_){
 	int lid = updated_layer_ * (chunk_ * 2);
@@ -803,6 +804,7 @@ void OverlapSync<Dtype>::on_gradients_ready() {
 	CUDA_CHECK(cudaMemcpyAsync(diff_ + offset, grads_ + offset, sizeof(Dtype) * size,
 				   cudaMemcpyHostToDevice,
 				   h2d_stream_));
+	updated_layers_.pop();
       }
     }
   }
