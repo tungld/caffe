@@ -28,8 +28,6 @@ using std::ostringstream;
 
 DEFINE_bool(bvlc, false,
     "Optional; if running in the original BVLC/Caffe mode.");
-DEFINE_int32(chunk, 1,
-    "Optional; # of layers to exchange b/w gpus and host in one package.");
 DEFINE_int32(threshold, 2000000,
     "Optional; threshold from which openmp should be applied.");
 DEFINE_string(gpu, "",
@@ -281,7 +279,7 @@ int train() {
       criticals_free.push_back(new caffe::BlockingQueue<int>());
 
       // create solvers
-      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_chunk, FLAGS_threshold);
+      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_threshold);
       sync.Run(gpus);
 
       cudaFreeHost(grads);

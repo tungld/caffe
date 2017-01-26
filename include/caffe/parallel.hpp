@@ -129,7 +129,7 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   explicit OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
 		       OverlapSync<Dtype>* parent, const SolverParameter& param,
 		       Dtype* grads, vector<BlockingQueue<int>* >* criticals_free,
-		       int chunk, int threshold);
+		       int threshold);
   virtual ~OverlapSync();
 
   inline const shared_ptr<Solver<Dtype> >& solver() const {
@@ -199,7 +199,6 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   int inner_iter_;
   
   // command line arguments
-  int chunk_;
   int threshold_;
   
   using Params<Dtype>::size_;

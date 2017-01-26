@@ -449,7 +449,7 @@ template<typename Dtype>
 OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
 			OverlapSync<Dtype>* parent, const SolverParameter& param,
 			Dtype* grads, vector<BlockingQueue<int>* >* criticals_free,
-			int chunk, int threshold)
+			int threshold)
     : GPUParams<Dtype>(root_solver, param.device_id()),
       parent_(parent),
       children_(),
@@ -458,7 +458,7 @@ OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
       solver_(),
       grads_(grads),
       criticals_free_(criticals_free),
-      chunk_(chunk), threshold_(threshold){
+      threshold_(threshold){
 #ifndef CPU_ONLY
   int initial_device;
   CUDA_CHECK(cudaGetDevice(&initial_device));
@@ -850,7 +850,7 @@ void OverlapSync<Dtype>::Prepare(const vector<int>& gpus,
         }
         if (parent) {
           param.set_device_id(pairs[i].device());
-          syncs->at(i).reset(new OverlapSync<Dtype>(solver_, parent, param, grads_, criticals_free_, chunk_, threshold_));
+          syncs->at(i).reset(new OverlapSync<Dtype>(solver_, parent, param, grads_, criticals_free_, threshold_));
           parent->children_.push_back((OverlapSync<Dtype>*) syncs->at(i).get());
         }
       }
