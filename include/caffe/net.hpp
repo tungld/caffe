@@ -211,6 +211,9 @@ class Net {
   inline const vector<int> learnable_params_id_vecs(int layer_id) const {
     return learnable_params_id_vecs_[layer_id];
   }
+  inline int learnable_params_id_vecs() const {
+    return learnable_params_id_vecs_.size();
+  }
   /// @brief returns the learnable parameter learning rate multipliers
   inline const vector<float>& params_lr() const { return params_lr_; }
   inline const vector<bool>& has_params_lr() const { return has_params_lr_; }

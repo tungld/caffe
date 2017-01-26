@@ -650,12 +650,11 @@ template<typename Dtype>
 void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 #ifndef CPU_ONLY
   if(inner_iter_ == (solver_->param().iter_size() - 1)){
-    const vector<int> learnable_params_id_vecs = solver_->net()
+    const vector<int> curr_params_vecs = solver_->net()
       ->learnable_params_id_vecs(l);
-    if ((learnable_params_id_vecs.size() > 0) &&
-	(learnable_params_id_vecs[0] % (chunk_ * 2) == 0)){
+    if (curr_params_vecs.size() > 0){
       // wait for reseting global variables
-      if (learnable_params_id_vecs[0] == (blobs_num_ - (chunk_ * 2))){
+      if (curr_params_vecs[0] == (blobs_num_ - curr_params_vecs.size())){
 	int last = criticals_free_->size() - 1;
 	criticals_free_->at(last)->pop();
       }
@@ -666,11 +665,13 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 	int updated_layer_ = updated_layers_.peek();
 	if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
 	  if (updated_solvers == solvers_num_){
-	    int lid = updated_layer_ * (chunk_ * 2);
+	    const vector<int> prev_params_vecs = solver_->net()
+	      ->learnable_params_id_vecs(updated_layer_);
+	    int lid = prev_params_vecs[0];
 	    int offset = pid_aid_.at(lid);
 	    int size = 0;
     
-	    for (int i = lid; i < lid + (chunk_ * 2); ++i){
+	    for (int i = lid; i < lid + prev_params_vecs.size(); ++i){
 	      size += pid_size_.at(i);
 	    }
 
@@ -683,12 +684,11 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
       }
 
       // send current gradients to host and do accumulation
-      int lid = learnable_params_id_vecs[0];
-      int glid = lid / (chunk_ * 2);
+      int lid = curr_params_vecs[0];
 #ifdef USE_NVTX
       ostringstream msg;
-      msg << "postlayer " << glid;
-      if (glid % 2) {
+      msg << "postlayer " << l;
+      if (l % 2) {
 	push_nvmark_range(msg.str(), 5);
       } else {
 	push_nvmark_range(msg.str(), 6);
@@ -698,7 +698,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
       int offset = pid_aid_.at(lid);
       int size = 0;
     
-      for (int i = lid; i < lid + (chunk_ * 2); ++i){
+      for (int i = lid; i < lid + curr_params_vecs.size(); ++i){
 	size += pid_size_.at(i);
       }
 
@@ -706,7 +706,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 	vector<int> vt;
 	vt.push_back(offset);
 	vt.push_back(size);
-	vt.push_back(glid);
+	vt.push_back(l);
 	ready_blobs_.push(vt);
 
 	CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
@@ -714,7 +714,7 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
 				   d2h_h_stream_));
 	cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
 			      (void*)this, 0);
-	updated_layers_.push(glid);
+	updated_layers_.push(l);
       }
 #ifdef USE_NVTX
       pop_nvmark_range();
@@ -729,7 +729,7 @@ void OverlapSync<Dtype>::accumulate_gradients() {
   vector<int> vt = ready_blobs_.pop();
   int offset = vt[0];
   int size = vt[1];
-  int glid = vt[2];
+  int l = vt[2];
 
   // Add up local gradients (on GPU) to the global gradients (on CPU)
   Dtype* acc = grads_ + offset;
@@ -737,7 +737,7 @@ void OverlapSync<Dtype>::accumulate_gradients() {
 
   // CPUTimer timer;
   // timer.Start();
-  int idx = criticals_free_->at(glid)->pop();
+  int idx = criticals_free_->at(l)->pop();
 #ifdef USE_NVTX
   ostringstream msg;
   msg << "[" << solver_->param().device_id() << "] [CPU] Accum. for " << (float)(size * sizeof(Dtype) / (float)1000 / (float)1000) << " MB";
@@ -767,7 +767,7 @@ void OverlapSync<Dtype>::accumulate_gradients() {
       }      
     }
   }
-  criticals_free_->at(glid)->push(++idx);
+  criticals_free_->at(l)->push(++idx);
   // timer.Stop();
   // LOG(INFO) << size << " parameters, accumulation time " << timer.MicroSeconds() << " us";
 
@@ -793,11 +793,13 @@ void OverlapSync<Dtype>::on_gradients_ready() {
     int updated_layer_ = updated_layers_.peek();
     if (criticals_free_->at(updated_layer_)->try_peek(&updated_solvers)){
       if (updated_solvers == solvers_num_){
-	int lid = updated_layer_ * (chunk_ * 2);
+	const vector<int> prev_params_vecs = solver_->net()
+	  ->learnable_params_id_vecs(updated_layer_);
+	int lid = prev_params_vecs[0];
 	int offset = pid_aid_.at(lid);
 	int size = 0;
     
-	for (int i = lid; i < lid + (chunk_ * 2); ++i){
+	for (int i = lid; i < lid + prev_params_vecs.size(); ++i){
 	  size += pid_size_.at(i);
 	}
 
