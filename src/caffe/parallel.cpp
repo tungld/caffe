@@ -474,7 +474,9 @@ OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
     Caffe::set_root_solver(true);
   }
   this->configure(solver_.get());
-  solver_->net()->MapLayerLearnableParams();
+  if (parent != NULL) {
+    solver_->net()->MapLayerLearnableParams();
+  }
   solver_->add_callback(this);
   solver_->add_icallback(this);
   solver_->net()->add_callback(this);
