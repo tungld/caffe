@@ -28,8 +28,6 @@ using std::ostringstream;
 
 DEFINE_bool(bvlc, false,
     "Optional; if running in the original BVLC/Caffe mode.");
-DEFINE_int32(chunk, 1,
-    "Optional; # of layers to exchange b/w gpus and host in one package.");
 DEFINE_int32(threshold, 2000000,
     "Optional; threshold from which openmp should be applied.");
 DEFINE_string(gpu, "",
@@ -259,20 +257,21 @@ int train() {
       // prepare a CPU buffer
       const vector<Blob<float>*>& params =
 	solver->net()->learnable_params();
-
-      CHECK_EQ(params.size() % (FLAGS_chunk * 2), 0);
-  
+      solver->net()->MapLayerLearnableParams();
+      
       size_t size = 0;
       for (int i = 0; i < params.size(); ++i)
 	size += params[i]->count();
       size = (size > 0) ? size : 1;
+
+      int n_layers = solver->net()->learnable_params_id_vecs();
 
       // Gradients on the host
       float* grads;
       CUDA_CHECK(cudaMallocHost((void**)&grads, size * sizeof(float)));
 
       vector<caffe::BlockingQueue<int>* > criticals_free;
-      for (int i = 0; i < params.size() / (FLAGS_chunk * 2); ++i){
+      for (int i = 0; i < n_layers; ++i){
 	caffe::BlockingQueue<int>* critical_free = new caffe::BlockingQueue<int>();
 	critical_free->push(0);
 	criticals_free.push_back(critical_free);
@@ -280,7 +279,7 @@ int train() {
       criticals_free.push_back(new caffe::BlockingQueue<int>());
 
       // create solvers
-      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_chunk, FLAGS_threshold);
+      caffe::OverlapSync<float> sync(solver, NULL, solver->param(), grads, &criticals_free, FLAGS_threshold);
       sync.Run(gpus);
 
       cudaFreeHost(grads);
