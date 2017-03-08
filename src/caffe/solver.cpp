@@ -9,10 +9,13 @@
 #include "caffe/util/hdf5.hpp"
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
+#include "caffe/util/benchmark.hpp"
 
 #ifdef USE_NVTX
 #include "caffe/util/mark_profile.hpp"
 #endif
+
+using caffe::Timer;
 
 namespace caffe {
 
@@ -197,12 +200,14 @@ void Solver<Dtype>::InitTestNets() {
 
 template <typename Dtype>
 void Solver<Dtype>::Step(int iters) {
+  Timer iteration_timer;
   const int start_iter = iter_;
   const int stop_iter = iter_ + iters;
   int average_loss = this->param_.average_loss();
   losses_.clear();
   smoothed_loss_ = 0;
 
+  iteration_timer.Start();
   while (iter_ < stop_iter) {
     // zero-init the params
     net_->ClearParamDiffs();
@@ -277,7 +282,13 @@ void Solver<Dtype>::Step(int iters) {
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     pop_nvmark_range();
 #endif
-    
+
+    if (display) {
+      LOG_IF(INFO, Caffe::root_solver()) << "    Time: "
+					 << iteration_timer.Seconds() << "s/"
+	                     << (iter_ > 0 ? param_.display() : 1) << "iters";
+            iteration_timer.Start();
+    }
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
