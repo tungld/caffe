@@ -6,6 +6,8 @@
 
 namespace caffe {
 
+__global__ void sync_scale() { }
+  
 template <typename Dtype>
 __global__ void ScaleForward(const int n, const Dtype* in,
     const Dtype* scale, const int scale_dim, const int inner_dim,
@@ -53,6 +55,7 @@ void ScaleLayer<Dtype>::Forward_gpu(
         <<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, bottom_data, scale_data, scale_dim_, inner_dim_, top_data);
   }
+  sync_scale<<<1, 1>>>();  
 }
 
 template <typename Dtype>
@@ -128,6 +131,7 @@ void ScaleLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         <<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, top_diff, scale_data, scale_dim_, inner_dim_, bottom_diff);
   }
+  sync_scale<<<1, 1>>>();
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(ScaleLayer);

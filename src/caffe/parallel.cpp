@@ -655,7 +655,6 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
     const vector<int> curr_params_vecs = solver_->net()
       ->learnable_params_id_vecs(l);
     if (curr_params_vecs.size() > 0){
-      CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
       // wait for reseting global variables
       if (curr_params_vecs[0] == (blobs_num_ - curr_params_vecs.size())){
 	int last = criticals_free_->size() - 1;
