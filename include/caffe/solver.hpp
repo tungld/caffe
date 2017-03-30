@@ -74,6 +74,9 @@ class Solver {
   }
   int iter() { return iter_; }
 
+  void grad_overhead(float n) { grad_overhead_ = n; }
+  float grad_overhead() {return grad_overhead_; }
+  
   // Invoked at specific points during an iteration
   class Callback {
    protected:
@@ -131,6 +134,7 @@ class Solver {
   vector<ICallback*> icallbacks_;
   vector<Dtype> losses_;
   Dtype smoothed_loss_;
+  float grad_overhead_;
 
   // The root solver that holds root nets (actually containing shared layers)
   // in data parallelism

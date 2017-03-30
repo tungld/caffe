@@ -786,10 +786,13 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   CUDA_CHECK(cudaGetDevice(&device));
   CHECK(device == solver_->param().device_id());
 #endif
+  Timer g_timer_;
+  g_timer_.Start();
 
   // send remaining gradients on host to devices
   // do this only when all callbacks finished
   CUDA_CHECK(cudaStreamSynchronize(d2h_h_stream_));
+
   int updated_solvers = 0;
   while (updated_layers_.size() > 0) {
     int updated_layer_ = updated_layers_.peek();
@@ -816,6 +819,23 @@ void OverlapSync<Dtype>::on_gradients_ready() {
   // Wait for the last stream finished
   CUDA_CHECK(cudaStreamSynchronize(h2d_stream_));
 
+  g_timer_.Stop();
+  grad_overhead_ = g_timer_.Seconds();
+
+  for (int i = 0; i < children_.size(); ++i) {
+    OverlapSync<Dtype> *child = queue_.pop();
+    float child_overhead = child->grad_overhead_;
+    if (child_overhead < grad_overhead_){
+      grad_overhead_ = child_overhead;
+    }
+  }
+
+  if (parent_) {
+    parent_->queue_.push(this);
+  } else {
+    solver_->grad_overhead(grad_overhead_);
+  }
+  
   // Loss functions divide gradients by the batch size, so to compensate
   // for split batch, the root solver divides by number of solvers.
   caffe_gpu_scal(size_, Dtype(1.0 / Caffe::solver_count()), diff_);

@@ -154,6 +154,9 @@ message SolverParameter {
   // accumulate gradients over `iter_size` x `batch_size` instances
   optional int32 iter_size = 36 [default = 1];
 
+  // the percentage of gradient accumulation overhead on host
+  optional int32 allowed_overhead_percentage = 41 [default = 2];
+  
   // The learning rate decay policy. The currently implemented learning rate
   // policies are as follows:
   //    - fixed: always return base_lr.

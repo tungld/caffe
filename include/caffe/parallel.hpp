@@ -197,6 +197,9 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   #endif
   // iteration index if iter_size is set
   int inner_iter_;
+
+  // overhead of gradient accumulation on host
+  float grad_overhead_;
   
   // command line arguments
   int threshold_;

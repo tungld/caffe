@@ -284,10 +284,22 @@ void Solver<Dtype>::Step(int iters) {
 #endif
 
     if (display) {
-      LOG_IF(INFO, Caffe::root_solver()) << "    Time: "
-					 << iteration_timer.Seconds() << "s/"
-	                     << (iter_ > 0 ? param_.display() : 1) << "iters";
-            iteration_timer.Start();
+      float iteration_elapsed = iteration_timer.Seconds()/(iter_ > 0 ? param_.display() : 1);
+      LOG_IF(INFO, Caffe::root_solver()) << "    Average time: "
+					 << iteration_elapsed
+					 << " seconds/iteration";
+      float overhead_percentage = grad_overhead_ / iteration_elapsed * 100;
+      if (overhead_percentage > param_.allowed_overhead_percentage()) {
+	LOG_IF(INFO, Caffe::root_solver())
+	  << "    Iteration " << iter_ << ","
+	  << " gradient accumulation on host looks slow ( "
+	  << overhead_percentage << " %"
+	  << " slower than the computation on GPU)."
+	  << " Close unnecessary applications that consume CPU"
+	  << " or set a propriate value for the option --threshold.";
+      }
+      
+      iteration_timer.Start();
     }
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
