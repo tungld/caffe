@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <climits>
 
 #include <string>
 #include <sstream>
@@ -69,6 +70,11 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
   iter_ = 0;
   current_step_ = 0;
+  lwr_chunk_ = 1;
+  lwr_chunk_best_ = 1;
+  lwr_lapse_min_ = FLT_MAX;
+  lwr_opt_done_ = false;
+  lwr_interval_ = 10;
 }
 
 template <typename Dtype>
@@ -273,6 +279,34 @@ void Solver<Dtype>::Step(int iters) {
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_gradients_ready();
     }
+    
+    // adjust chunk
+    if (param_.lwr_opt()) {
+      int lwr_step = param_.lwr_opt_step();
+      int lwr_range = param_.lwr_opt_range();
+      // ignore the first lwr_step iterations
+      if (((iter_ + 1) % lwr_interval_ == 0) && !lwr_opt_done_ && (iter_ + 1) < 2*lwr_interval_)  {
+	lwr_timer_.Start();
+      }
+      if (((iter_ + 1) % lwr_interval_ == 0) && !lwr_opt_done_ && (iter_ +1) >= 2*lwr_interval_) {
+	if ((lwr_chunk_ < lwr_chunk_best_ + lwr_step*lwr_range) ||
+	    (lwr_chunk_ > this->net()->layers().size())) {
+	  float curr_lapse = lwr_timer_.Seconds();
+	  if (curr_lapse < lwr_lapse_min_) {
+	    lwr_chunk_best_ = lwr_chunk_;
+	    lwr_lapse_min_ = curr_lapse;
+	  }
+	  lwr_chunk_ = (lwr_chunk_ < lwr_step)?
+	    (lwr_chunk_ + 1):(lwr_chunk_ + lwr_step);
+	  lwr_timer_.Start();
+	} else {
+	  lwr_chunk_ = lwr_chunk_best_;
+	  lwr_opt_done_ = true;
+	  LOG(INFO) << "    Found the best chunk for layer-wise-reduction: " << lwr_chunk_best_;
+	}
+      }
+    }
+
 #ifdef USE_NVTX
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     push_nvmark_range("Update parameters", 4);

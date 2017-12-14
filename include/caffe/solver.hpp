@@ -6,6 +6,7 @@
 
 #include "caffe/net.hpp"
 #include "caffe/solver_factory.hpp"
+#include "caffe/util/benchmark.hpp"
 
 namespace caffe {
 
@@ -73,6 +74,7 @@ class Solver {
     return test_nets_;
   }
   int iter() { return iter_; }
+  int lwr_chunk() const { return lwr_chunk_; }
 
   void grad_overhead(float n) { grad_overhead_ = n; }
   float grad_overhead() {return grad_overhead_; }
@@ -135,6 +137,10 @@ class Solver {
   vector<Dtype> losses_;
   Dtype smoothed_loss_;
   float grad_overhead_;
+  int lwr_chunk_; // chunk used for layer-wise-reduction
+  int lwr_chunk_best_; // the best chunk for layer-wise-reduction
+  bool lwr_opt_done_;
+  int lwr_interval_;
 
   // The root solver that holds root nets (actually containing shared layers)
   // in data parallelism
@@ -146,6 +152,10 @@ class Solver {
 
   // True iff a request to stop early was received.
   bool requested_early_exit_;
+
+  // Timing information
+  Timer lwr_timer_;
+  float lwr_lapse_min_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };
