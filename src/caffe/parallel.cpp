@@ -458,7 +458,8 @@ OverlapSync<Dtype>::OverlapSync(shared_ptr<Solver<Dtype> > root_solver,
       solver_(),
       grads_(grads),
       criticals_free_(criticals_free),
-      threshold_(threshold){
+      threshold_(threshold),
+      passed_layers_() {
 #ifndef CPU_ONLY
   int initial_device;
   CUDA_CHECK(cudaGetDevice(&initial_device));
@@ -686,37 +687,47 @@ void OverlapSync<Dtype>::on_gradients_layers_ready(int l) {
       }
 
       // send current gradients to host and do accumulation
-      int lid = curr_params_vecs[0];
+      passed_layers_.push(l);
+      if (passed_layers_.size() == solver_->lwr_chunk() ||
+	  (l % solver_->lwr_chunk()) == l) {
+	CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
+	while (passed_layers_.size() > 0){
+	  int layer = passed_layers_.pop();
+	  const vector<int> curr_params_vecs = solver_->net()
+	    ->learnable_params_id_vecs(layer);
+	  int lid = curr_params_vecs[0];
 #ifdef USE_NVTX
-      ostringstream msg;
-      msg << "postlayer " << l;
-      if (l % 2) {
-	push_nvmark_range(msg.str(), 5);
-      } else {
-	push_nvmark_range(msg.str(), 6);
-      }
+	  ostringstream msg;
+	  msg << "postlayer " << layer;
+	  if (layer % 2) {
+	    push_nvmark_range(msg.str(), 5);
+	  } else {
+	    push_nvmark_range(msg.str(), 6);
+	  }
 #endif
       
-      int offset = pid_aid_.at(lid);
-      int size = 0;
+	  int offset = pid_aid_.at(lid);
+	  int size = 0;
     
-      for (int i = lid; i < lid + curr_params_vecs.size(); ++i){
-	size += pid_size_.at(i);
-      }
+	  for (int i = lid; i < lid + curr_params_vecs.size(); ++i){
+	    size += pid_size_.at(i);
+	  }
 
-      if (size > 0){ // Copy blob values and do accumulation
-	vector<int> vt;
-	vt.push_back(offset);
-	vt.push_back(size);
-	vt.push_back(l);
-	ready_blobs_.push(vt);
+	  if (size > 0){ // Copy blob values and do accumulation
+	    vector<int> vt;
+	    vt.push_back(offset);
+	    vt.push_back(size);
+	    vt.push_back(layer);
+	    ready_blobs_.push(vt);
 
-	CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
-				   sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
-				   d2h_h_stream_));
-	cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
-			      (void*)this, 0);
-	updated_layers_.push(l);
+	    CUDA_CHECK(cudaMemcpyAsync(cpu_diff_ + offset, diff_ + offset,
+				       sizeof(Dtype) * size, cudaMemcpyDeviceToHost,
+				       d2h_h_stream_));
+	    cudaStreamAddCallback(d2h_h_stream_, OverlapSync<Dtype>::callback_grads, 
+				  (void*)this, 0);
+	    updated_layers_.push(layer);
+	  }
+	}
       }
 #ifdef USE_NVTX
       pop_nvmark_range();

@@ -201,6 +201,8 @@ class OverlapSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   // overhead of gradient accumulation on host
   float grad_overhead_;
   
+  BlockingQueue<int> passed_layers_;
+
   // command line arguments
   int threshold_;
   

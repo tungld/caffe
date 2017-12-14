@@ -14,3 +14,4 @@ weight_decay: 0.0001
 snapshot: 5000
 snapshot_prefix: "models/resnet-152/caffe_resnet_train"
 solver_mode: GPU
+lwr_opt: false
