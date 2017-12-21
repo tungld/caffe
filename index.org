@@ -35,7 +35,7 @@ Datasets and neural network models for the paper are put in the directory ~icpe1
 $ ls icpe18-artifact
 datasets  models
 #+end_example
-
+Datasets are just for measuring performance not accuracy.
 ** Get results for Figure 6(a)
 Figure 6(a) showed a comparison between the original caffe and our CGDP method
 for three neural networks: AlexNet, GoogLeNet and VGGNets.  Configuration files
@@ -146,13 +146,13 @@ $ cd icpe18-artifact
 $ ../build/tools/caffe.bin train --solver models/resnet-152/solver.prototxt --gpu 0,1,2,3 --bvlc
 #+end_example
 
-For the second result, invoke the following command:
+For the third result, invoke the following command:
 #+begin_example
 $ cd icpe18-artifact
 $ ../build/tools/caffe.bin train --solver models/resnet-152/solver.prototxt --gpu 0,1,2,3
 #+end_example
 
-For the second result, invoke the following command:
+For the fourth result, invoke the following command:
 #+begin_example
 $ cd icpe18-artifact
 $ ../build/tools/caffe.bin train --solver models/resnet-152/solver_lwr_opt.prototxt --gpu 0,1,2,3
