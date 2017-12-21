@@ -1,7 +1,7 @@
 net: "models/vggnet/train_val.prototxt"
-test_iter: 10
-test_interval: 1000
-test_initialization: false
+# test_iter: 10
+# test_interval: 1000
+# test_initialization: false
 display: 10
 base_lr: 0.016968
 lr_policy: "step"
