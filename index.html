@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Involving CPUs into Multi-GPU Deep Learning</title>
-<!-- 2017-12-22 Fri 00:33 -->
+<!-- 2017-12-23 Sat 01:04 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Tung Le Duc" />
@@ -138,10 +138,20 @@ for the JavaScript code in this tag.
 <body>
 <div id="content">
 <h1 class="title">Involving CPUs into Multi-GPU Deep Learning</h1>
-
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Getting started</h2>
+<h2 id="sec-1">Links</h2>
 <div class="outline-text-2" id="text-1">
+</div><div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1"><a href="ICPE_2018_paper_60.pdf">Link to the paper</a></h3>
+</div>
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2"><a href="https://github.com/tungld/caffe">Public link to the artifact</a></h3>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Getting started</h2>
+<div class="outline-text-2" id="text-2">
 <p>
 We extended Caffe, an open source deep learning framework, to provide features
 proposed in the paper.
@@ -168,9 +178,10 @@ Because we use CPUs for gradient accumulation via OpenMP, please confirm that th
 process dominated CPUs on host while running experiments.
 </p>
 </div>
-<div id="outline-container-sec-1-1" class="outline-3">
-<h3 id="sec-1-1">Compilation</h3>
-<div class="outline-text-3" id="text-1-1">
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Compilation</h3>
+<div class="outline-text-3" id="text-2-1">
 <p>
 Follow <a href="http://caffe.berkeleyvision.org/installation.html">Caffe's installation instructions</a> to compile the source code.
 In the paper, we used GPUs for training, thus we need to compile Caffe with CUDA and cuDNN.
@@ -191,9 +202,9 @@ After compiling the source code, execution files are generated in the directory 
 </div>
 </div>
 </div>
-<div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Step-by-step instructions</h2>
-<div class="outline-text-2" id="text-2">
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Step-by-step instructions</h2>
+<div class="outline-text-2" id="text-3">
 <p>
 Datasets and neural network models for the paper are put in the directory <code>icpe18-artifact</code>
 </p>
@@ -205,9 +216,9 @@ datasets  models
 Datasets are just for measuring performance not accuracy.
 </p>
 </div>
-<div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1">Get results for Figure 6(a)</h3>
-<div class="outline-text-3" id="text-2-1">
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Get results for Figure 6(a)</h3>
+<div class="outline-text-3" id="text-3-1">
 <p>
 Figure 6(a) showed a comparison between the original caffe and our CGDP method
 for three neural networks: AlexNet, GoogLeNet and VGGNets.  Configuration files
@@ -313,9 +324,9 @@ $ ../build/tools/caffe.bin train --solver models/bvlc_googlenet/solver.prototxt 
 </div>
 </div>
 
-<div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">Get results for Figure 8</h3>
-<div class="outline-text-3" id="text-2-2">
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Get results for Figure 8</h3>
+<div class="outline-text-3" id="text-3-2">
 <p>
 Figure 8 showed results for Resnet-152 using our CGDP method together with a
 heuristic algorithm to find a good chunk of layers.
@@ -382,7 +393,7 @@ Parameters for the heuristic algorithm are configured by modifying the file
 </div>
 </div>
 <div id="postamble" class="status">
-<p class=\"postamble\">Last updated 2017-12-22 Fri 00:33 . Created by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.5.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class=\"postamble\">Last updated 2017-12-23 Sat 01:04 . Created by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.5.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 </div>
 </body>
 </html>

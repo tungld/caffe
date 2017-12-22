@@ -1,5 +1,8 @@
 #+TITLE: Involving CPUs into Multi-GPU Deep Learning
 #+OPTIONS: toc:nil num:nil ^:nil html-postamble:t html-preamble:t
+* Links
+** [[file:ICPE_2018_paper_60.pdf][Link to the paper]]
+** [[https://github.com/tungld/caffe][Public link to the artifact]]
 
 * Getting started
 We extended Caffe, an open source deep learning framework, to provide features
@@ -17,6 +20,7 @@ The second feature are mainly implemented in the file [[file:src/caffe/solver.cp
 
 Because we use CPUs for gradient accumulation via OpenMP, please confirm that there is no
 process dominated CPUs on host while running experiments.
+
 ** Compilation
 Follow [[http://caffe.berkeleyvision.org/installation.html][Caffe's installation instructions]] to compile the source code.
 In the paper, we used GPUs for training, thus we need to compile Caffe with CUDA and cuDNN.
