@@ -2,7 +2,7 @@
 #+OPTIONS: toc:nil num:nil ^:nil html-postamble:t html-preamble:t
 * Links
 ** [[file:ICPE_2018_paper_60.pdf][Link to the paper]]
-** [[https://github.com/tungld/caffe][Public link to the artifact]]
+** [[https://github.com/tungld/caffe/tree/rc3-b2982c7-ibm-icpe][Public link to the artifact]]
 
 * Getting started
 We extended Caffe, an open source deep learning framework, to provide features
